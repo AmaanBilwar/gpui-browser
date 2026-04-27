@@ -29,6 +29,13 @@ actions!(
     ]
 );
 
+/// Height of the full search bar; text line matches.
+const BAR_H: f32 = 28.0;
+const CHROME_W: f32 = 32.0;
+const FIELD_TEXT: f32 = 15.0;
+const FIELD_LINE: f32 = 15.0;
+const CURSOR_W: f32 = 1.5;
+
 /// Single-line text field (adapted from the GPUI `input` example) for search/URL-style input.
 pub struct SearchInput {
     focus_handle: FocusHandle,
@@ -36,6 +43,8 @@ pub struct SearchInput {
     placeholder: SharedString,
     content_color: Hsla,
     placeholder_color: Hsla,
+    left_chrome: SharedString,
+    right_chrome: SharedString,
     selected_range: Range<usize>,
     selection_reversed: bool,
     marked_range: Option<Range<usize>>,
@@ -46,12 +55,23 @@ pub struct SearchInput {
 
 impl SearchInput {
     pub fn new(cx: &mut Context<Self>, placeholder: impl Into<SharedString>) -> Self {
+        Self::with_chrome_labels(cx, placeholder, "‹", "›")
+    }
+
+    pub fn with_chrome_labels(
+        cx: &mut Context<Self>,
+        placeholder: impl Into<SharedString>,
+        left: impl Into<SharedString>,
+        right: impl Into<SharedString>,
+    ) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
             content: "".into(),
             placeholder: placeholder.into(),
             content_color: hsla(0.0, 0.0, 0.92, 1.0),
             placeholder_color: hsla(0.0, 0.0, 0.48, 1.0),
+            left_chrome: left.into(),
+            right_chrome: right.into(),
             selected_range: 0..0,
             selection_reversed: false,
             marked_range: None,
@@ -135,6 +155,24 @@ impl SearchInput {
         if self.is_selecting {
             self.select_to(self.index_for_mouse_position(event.position), cx);
         }
+    }
+
+    fn on_chrome_left(
+        &mut self,
+        _: &MouseUpEvent,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) {
+        // e.g. back
+    }
+
+    fn on_chrome_right(
+        &mut self,
+        _: &MouseUpEvent,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) {
+        // e.g. go / search
     }
 
     fn show_character_palette(
@@ -504,9 +542,9 @@ impl Element for TextElement {
                 Some(fill(
                     Bounds::new(
                         point(bounds.left() + cursor_pos, bounds.top()),
-                        size(px(2.), bounds.bottom() - bounds.top()),
+                        size(px(CURSOR_W), bounds.bottom() - bounds.top()),
                     ),
-                    gpui::blue(),
+                    gpui::white(),
                 )),
             )
         } else {
@@ -572,42 +610,82 @@ impl Element for TextElement {
 
 impl Render for SearchInput {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let left = self.left_chrome.clone();
+        let right = self.right_chrome.clone();
         div()
-            .flex()
-            .key_context("SearchInput")
-            .track_focus(&self.focus_handle(cx))
-            .cursor(CursorStyle::IBeam)
-            .on_action(cx.listener(Self::backspace))
-            .on_action(cx.listener(Self::delete))
-            .on_action(cx.listener(Self::left))
-            .on_action(cx.listener(Self::right))
-            .on_action(cx.listener(Self::select_left))
-            .on_action(cx.listener(Self::select_right))
-            .on_action(cx.listener(Self::select_all))
-            .on_action(cx.listener(Self::home))
-            .on_action(cx.listener(Self::end))
-            .on_action(cx.listener(Self::show_character_palette))
-            .on_action(cx.listener(Self::paste))
-            .on_action(cx.listener(Self::cut))
-            .on_action(cx.listener(Self::copy))
-            .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
-            .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .on_mouse_move(cx.listener(Self::on_mouse_move))
             .w_full()
-            .rounded_lg()
+            .h(px(BAR_H))
+            // .rounded_msd()
             .border_1()
             .border_color(rgb(0x3a3a3a))
             .bg(rgb(0x2a2a2a))
-            .line_height(px(32.0))
-            .text_size(px(16.0))
+            .flex()
+            .flex_row()
+            .items_center()
             .child(
                 div()
-                    .h(px(40.0))
-                    .w_full()
-                    .px_3()
+                    .w(px(CHROME_W))
+                    .h_full()
                     .flex()
                     .items_center()
+                    .justify_center()
+                    .text_size(px(12.0))
+                    .text_color(hsla(0.0, 0.0, 0.68, 1.0))
+                    .border_r_1()
+                    .border_color(rgb(0x3a3a3a))
+                    .cursor_pointer()
+                    .child(left)
+                    .hover(|s| s.bg(rgb(0x333333)))
+                    .on_mouse_up(MouseButton::Left, cx.listener(Self::on_chrome_left)),
+            )
+            .child(
+                div()
+                    .w(px(CHROME_W))
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(12.0))
+                    .text_color(hsla(0.0, 0.0, 0.68, 1.0))
+                    .border_l_1()
+                    .border_color(rgb(0x3a3a3a))
+                    .cursor_pointer()
+                    .child(right)
+                    .hover(|s| s.bg(rgb(0x333333)))
+                    .on_mouse_up(MouseButton::Left, cx.listener(Self::on_chrome_right)),
+            )
+            .child(
+                div()
+                    .id("search-field")
+                    .flex_1()
+                    .min_w(px(0.0))
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .key_context("SearchInput")
+                    .track_focus(&self.focus_handle(cx))
+                    .cursor(CursorStyle::IBeam)
+                    .on_action(cx.listener(Self::backspace))
+                    .on_action(cx.listener(Self::delete))
+                    .on_action(cx.listener(Self::left))
+                    .on_action(cx.listener(Self::right))
+                    .on_action(cx.listener(Self::select_left))
+                    .on_action(cx.listener(Self::select_right))
+                    .on_action(cx.listener(Self::select_all))
+                    .on_action(cx.listener(Self::home))
+                    .on_action(cx.listener(Self::end))
+                    .on_action(cx.listener(Self::show_character_palette))
+                    .on_action(cx.listener(Self::paste))
+                    .on_action(cx.listener(Self::cut))
+                    .on_action(cx.listener(Self::copy))
+                    .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
+                    .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
+                    .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
+                    .on_mouse_move(cx.listener(Self::on_mouse_move))
+                    .line_height(px(FIELD_LINE))
+                    .text_size(px(FIELD_TEXT))
+                    .pl_1()
+                    .pr_1()
                     .child(TextElement { input: cx.entity() }),
             )
     }
