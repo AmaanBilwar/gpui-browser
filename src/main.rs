@@ -19,19 +19,13 @@ impl Render for Root {
         div()
             .flex()
             .flex_col()
-            .gap_3()
+            .justify_start()
             .size_full()
-            .p_4()
-            .items_center()
+            .w_full()
+            .pb_4()
+            .items_start()
             .bg(rgb(0x1e1e1e))
-            .text_lg()
-            .text_color(rgb(0xe0e0e0))
-            .child(
-                div()
-                    .w_full()
-                    .max_w(px(400.0))
-                    .child(self.search.clone()),
-            )
+            .child(self.search.clone())
     }
 }
 
@@ -74,6 +68,7 @@ fn main() {
                 },
                 |_, cx| {
                     let search = cx.new(|cx| {
+                        // Use `with_chrome_labels` for custom left/right labels.
                         SearchInput::new(cx, "Search or enter address...")
                     });
                     cx.new(|_| Root { search })
